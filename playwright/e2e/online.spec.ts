@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('should navigate to the landing page', async ({ page }) => {
+test('navega para a página inicial', async ({ page }) => {
   await page.goto('http://localhost:5173');
 
   await expect(page).toHaveTitle(/Velô by Papito/);

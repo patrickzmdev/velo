@@ -8,7 +8,6 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('navega para a página inicial', async ({ page }) => {
-  
   await expect(page.getByTestId('hero-section')).toBeVisible();
 });
 

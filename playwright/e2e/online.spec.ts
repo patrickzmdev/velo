@@ -18,6 +18,6 @@ test('deve exibir o pedido encontrado', async ({ page }) => {
   await page.getByPlaceholder('Ex: VLO-ABC123').fill(orderId);
   await expect(page.getByRole('button', { name: 'Buscar Pedido' })).toBeVisible();
   await page.getByRole('button', { name: 'Buscar Pedido' }).click();
-  await expect(page.getByTestId(`order-result-${orderId}`).getByRole('paragraph').filter({ hasText: orderId})).toBeVisible({ timeout: 10000});
+  await expect(page.getByTestId(`order-result-${orderId}`).getByRole('paragraph').filter({ hasText: orderId })).toBeVisible({ timeout: 10000 });
   await expect(page.getByTestId(`order-result-${orderId}`).filter({ hasText: 'APROVADO' })).toBeVisible();
 });

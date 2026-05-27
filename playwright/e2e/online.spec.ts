@@ -16,8 +16,9 @@ test('deve exibir o pedido encontrado', async ({ page }) => {
   await page.getByRole('link', { name: 'Consultar Pedido' }).click();
   await expect(page.getByRole('heading', { name: 'Consultar Pedido' })).toBeVisible();
   await page.getByPlaceholder('Ex: VLO-ABC123').fill(orderId);
-  await expect(page.getByRole('button', { name: 'Buscar Pedido' })).toBeVisible();
   await page.getByRole('button', { name: 'Buscar Pedido' }).click();
-  await expect(page.getByTestId(`order-result-${orderId}`).getByRole('paragraph').filter({ hasText: orderId })).toBeVisible({ timeout: 10000 });
+  //('..') volta para o elemento pai
+  const containerPedido = page.getByRole('paragraph').filter({ hasText: /^Pedido$/ }).locator('..');
+  await expect(containerPedido).toContainText(orderId);
   await expect(page.getByTestId(`order-result-${orderId}`).filter({ hasText: 'APROVADO' })).toBeVisible();
 });

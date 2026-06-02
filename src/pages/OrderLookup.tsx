@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Search, Package, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Search, Package, XCircle, Loader2 } from 'lucide-react';
+import { getOrderStatusConfig } from '@/lib/orderStatus';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,6 +30,7 @@ const carImages: Record<ExteriorColor, Record<WheelType, string>> = {
     sport: midnightBlackSport,
   },
 };
+
 
 const colorLabels: Record<ExteriorColor, string> = {
   'glacier-blue': 'Glacier Blue',
@@ -131,7 +133,11 @@ const OrderLookup = () => {
         )}
 
         {/* Order Result */}
-        {searchedOrder && (
+        {searchedOrder && (() => {
+          const statusConfig = getOrderStatusConfig(searchedOrder.status);
+          const StatusIcon = statusConfig.Icon;
+
+          return (
           <Card className="animate-fade-in" data-testid={`order-result-${searchedOrder.id}`}>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -146,20 +152,16 @@ const OrderLookup = () => {
                 </div>
                 <div
                   data-testid="order-result-status"
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
-                    searchedOrder.status === 'APROVADO'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-red-100 text-red-700'
-                  }`}
+                  data-order-status={searchedOrder.status}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${statusConfig.badgeClassName}`}
                 >
-                  {searchedOrder.status === 'APROVADO' ? (
-                    <CheckCircle className="w-4 h-4" />
-                  ) : (
-                    <XCircle className="w-4 h-4" />
-                  )}
-                  {searchedOrder.status}
+                  <StatusIcon className="w-4 h-4" />
+                  {statusConfig.label}
                 </div>
               </div>
+              {statusConfig.lookupHint && (
+                <p className="text-sm text-muted-foreground mt-3">{statusConfig.lookupHint}</p>
+              )}
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Car Image */}
@@ -237,7 +239,8 @@ const OrderLookup = () => {
               </div>
             </CardContent>
           </Card>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

@@ -1,8 +1,15 @@
 import { expect, type Page } from "@playwright/test";
 
+export async function preencherNumeroPedido(page: Page, numero: string) {
+    await page.getByRole('link', { name: 'Consultar Pedido' }).click();
+    await expect(page.getByRole('heading', { name: 'Consultar Pedido' })).toBeVisible();
+    await page.getByPlaceholder('Ex: VLO-ABC123').fill(numero);
+    await page.getByRole('button', { name: 'Buscar Pedido' }).click();
+}
+
 export async function validarOrderStatus(page: Page, orderId: string, status: string) { 
     await expect(page.getByRole('paragraph').filter({ hasText: /^Pedido$/ }).locator('..')).toContainText(orderId);
-    await expect(page.getByTestId(`order-result-${orderId}`).filter({ hasText: status })).toBeVisible();
+    await expect(page.getByTestId('order-result-status')).toHaveText(status);
 }
 
 export async function validarDadosCarro(page: Page, modelo: string, cor: string, interior: string, rodas: string) {

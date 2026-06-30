@@ -1,11 +1,16 @@
 import { test as base } from '@playwright/test';
-import { OrderLookupPage } from './pages/OrderLookupPage';
+import { createOrderLookupActions } from './actions/orderLookupActions';
 
-export const test = base.extend<{ orderLookupPage: OrderLookupPage }>({
-  orderLookupPage: async ({ page }, use) => {
-    const orderLookupPage = new OrderLookupPage(page);
-    await orderLookupPage.goToOrderLookupPage();
-    await use(orderLookupPage);
+type App = {
+  orderLookup: ReturnType<typeof createOrderLookupActions>;
+};
+
+export const test = base.extend<{ app: App }>({
+  app: async ({ page }, use) => {
+    const app: App = {
+      orderLookup: createOrderLookupActions(page),
+    };
+    await use(app);
   },
 });
 

@@ -7,7 +7,7 @@ export const orderApproved: Order = {
     model: 'Velô Sprint',
     color: 'Glacier Blue',
     interior: 'cream',
-    wheels: 'aero',
+    wheels: 'Aero Wheels',
     customer: {
       name: 'Patrick',
       email: 'teste@teste.com',
@@ -21,7 +21,7 @@ export const orderApproved: Order = {
     model: 'Velô Sprint',
     color: 'Lunar White',
     interior: 'cream',
-    wheels: 'sport',
+    wheels: 'Sport Wheels',
     customer: {
       name: 'Joao Pedro',
       email: 'teste2@teste.com',
@@ -35,7 +35,7 @@ export const orderApproved: Order = {
     model: 'Velô Sprint',
     color: 'Midnight Black',
     interior: 'cream',
-    wheels: 'aero',
+    wheels: 'Aero Wheels',
     customer: {
       name: 'Marcio',
       email: 'teste3@teste.com',

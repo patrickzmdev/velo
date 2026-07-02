@@ -189,7 +189,7 @@ const OrderLookup = () => {
                 </div>
                 <div>
                   <p className="text-muted-foreground">Rodas</p>
-                  <p className="font-medium capitalize">{searchedOrder.configuration.wheelType} Wheels</p>
+                  <p className="font-medium capitalize">{searchedOrder.configuration.wheelType.charAt(0).toUpperCase() + searchedOrder.configuration.wheelType.slice(1)} Wheels</p>
                 </div>
               </div>
 

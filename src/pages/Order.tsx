@@ -507,7 +507,7 @@ const Order = () => {
                 </li>
                 <li className="flex justify-between">
                   <span>Rodas</span>
-                  <span className="text-foreground capitalize">{configuration.wheelType} Wheels</span>
+                  <span className="text-foreground capitalize">{configuration.wheelType.charAt(0).toUpperCase() + configuration.wheelType.slice(1)} Wheels</span>
                 </li>
                 {(configuration.optionals as unknown as string[])
                   .filter((opt) => opt in (OPTIONAL_PRICES as Record<string, number>))

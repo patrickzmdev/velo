@@ -31,13 +31,8 @@ export function createConfiguratorActions(page: Page) {
     await expect(checkbox).toBeChecked({ checked: check });
   }
 
-  async function goToCheckout() {
+  async function finishConfigurator() {
     await elements.checkoutButton().click();
-    await expect(page).toHaveURL(/\/order$/);
-  }
-
-  async function expectCheckoutTotal(price: string) {
-    await expect(page.getByTestId('summary-total-price')).toHaveText(`R$ ${price}`);
   }
 
   async function validateSelectedValues(color: Color['name'], wheel: Wheels['name']) {
@@ -57,8 +52,7 @@ export function createConfiguratorActions(page: Page) {
     selectColor,
     selectWheel,
     toggleOptional,
-    goToCheckout,
-    expectCheckoutTotal,
+    finishConfigurator,
     expectPrice,
     validateSelectedValues,
   };

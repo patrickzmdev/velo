@@ -44,7 +44,7 @@ test.describe('CT02 - Configuração do Veículo (Cores e Rodas) e Cálculo do P
     await app.configurator.toggleOptional('Precision Park');
     await app.configurator.expectPrice('45.500,00');
 
-    await app.configurator.goToCheckout();
-    await app.configurator.expectCheckoutTotal('45.500,00');
+    await app.configurator.finishConfigurator();
+    await app.checkout.expectCheckoutTotal('45.500,00');
   });
 });

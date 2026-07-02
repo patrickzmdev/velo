@@ -1,6 +1,6 @@
 import { test } from '../support/fixtures';
 
-test.describe('CT02 - Configuração do Veículo (Cores e Rodas) e Cálculo do Preço Base', () => {
+test.describe('Configuração do Veículo (Cores e Rodas) e Cálculo do Preço Base', () => {
   test.beforeEach(async ({ app }) => {
     await app.configurator.goToConfigurator();
   });

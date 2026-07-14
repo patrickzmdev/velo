@@ -21,6 +21,8 @@ export default defineConfig({
   },
 
   testDir: './playwright/e2e',
+  /* Semeia os pedidos de teste no banco (via Kysely) antes de rodar a suíte */
+  globalSetup: './playwright/support/database/global.setup.ts',
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */

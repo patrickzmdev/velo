@@ -2,6 +2,14 @@ import { expect, Page } from '@playwright/test';
 import { CheckoutPersonalData } from '../interface/CheckoutPersonalData';
 import { FieldError } from '../interface/FieldError';
 
+const CREDIT_ANALYSIS_URL = '**/functions/v1/credit-analysis';
+
+const creditCorsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 export function createCheckoutActions(page: Page) {
   const summaryTotalPrice = () => page.getByTestId('summary-total-price');
   const storeSelect = () => page.getByLabel('Loja para Retirada');
@@ -86,9 +94,63 @@ export function createCheckoutActions(page: Page) {
     await expect(page).toHaveURL(/\/order$/);
   }
 
+  async function mockScore(score: number) {
+    await page.route(CREDIT_ANALYSIS_URL, async (route) => {
+      if (route.request().method() === 'OPTIONS') {
+        await route.fulfill({ status: 204, headers: creditCorsHeaders });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        headers: { ...creditCorsHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Done', score }),
+      });
+    });
+  }
+
+  async function expectCreditAnalysisError() {
+    await expect(page.getByTestId('toast-error')).toBeVisible();
+    await expect(page.getByTestId('toast-error')).toContainText(
+      'Falha ao consultar análise de crédito',
+    );
+    await expectStillOnCheckout();
+  }
+
+  async function fillAndCheckValuesInFinancing(entrada: string, valorTotal: string) {
+    const financingInfo = calculateFinancing(entrada, valorTotal);
+
+    await fillValue('Valor da Entrada', entrada);
+    await expect(page.getByText('Valor a financiar:')).toContainText(`R$ ${financingInfo.valorAFinanciar}`);
+    await expect(page.getByText('Parcela (12x):')).toContainText(`R$ ${financingInfo.valueParcel}`);
+    await expect(page.getByText('Total financiado:')).toContainText(`R$ ${financingInfo.totalFinancing}`);
+    await expect(page.getByText('Juros totais:')).toContainText(`R$ ${financingInfo.juros}`);
+  }
+
+  function calculateFinancing(entrada: string, valorTotal: string) {
+    const parseBRL = (v: string) => parseFloat(v.replace(/\./g, '').replace(',', '.'));
+    const formatBRL = (n: number) =>
+      n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const total = parseBRL(valorTotal);
+    const entryValue = parseBRL(entrada);
+
+    const amountToFinance = Math.max(0, total - entryValue);
+    const installmentValue = (amountToFinance / 12) * 1.02;
+    const totalFinanced = installmentValue * 12;
+    const juros = totalFinanced - amountToFinance;
+
+    return {
+      valorAFinanciar: formatBRL(amountToFinance),
+      valueParcel: formatBRL(installmentValue),
+      juros: formatBRL(juros),
+      totalFinancing: formatBRL(totalFinanced),
+    };
+  }
+
   return {
     fieldErrors,
     elements,
+    fillAndCheckValuesInFinancing,
     goToCheckout,
     expectCheckoutTotal,
     fillValue,
@@ -101,5 +163,7 @@ export function createCheckoutActions(page: Page) {
     expectFieldError,
     expectNoFieldError,
     expectStillOnCheckout,
+    expectCreditAnalysisError,
+    mockScore,
   };
 }

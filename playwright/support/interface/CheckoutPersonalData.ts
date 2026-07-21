@@ -5,4 +5,5 @@ export interface CheckoutPersonalData {
   phone: string;
   cpf: string;
   store: string;
+  paymentMethod: 'avista' | 'financiamento';
 }

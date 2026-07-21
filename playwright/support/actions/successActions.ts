@@ -14,9 +14,21 @@ export function createSuccessActions(page: Page) {
     await expect(page).toHaveURL(/\/success$/);
   }
 
+  async function expectStatus(status: 'APROVADO' | 'REPROVADO' | 'EM_ANALISE', title: string) {
+    await expect(statusTitle()).toHaveAttribute('data-order-status', status);
+    await expect(statusTitle()).toHaveText(title);
+  }
+
   async function expectApproved() {
-    await expect(statusTitle()).toHaveText('Pedido Aprovado!');
-    await expect(statusTitle()).toHaveAttribute('data-order-status', 'APROVADO');
+    await expectStatus('APROVADO', 'Pedido Aprovado!');
+  }
+
+  async function expectInAnalysis() {
+    await expectStatus('EM_ANALISE', 'Pedido em Análise');
+  }
+
+  async function expectRejected() {
+    await expectStatus('REPROVADO', 'Crédito Reprovado');
   }
 
   async function expectOrderNumberGenerated() {
@@ -39,7 +51,10 @@ export function createSuccessActions(page: Page) {
   return {
     elements,
     expectOnSuccessPage,
+    expectStatus,
     expectApproved,
+    expectInAnalysis,
+    expectRejected,
     expectOrderNumberGenerated,
     expectCustomerData,
   };

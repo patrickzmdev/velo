@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -9,5 +10,11 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  test: {
+    environment: "jsdom",
+    globals: true,
+    // Unit tests live under src/; Playwright specs under playwright/ run separately.
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
 });

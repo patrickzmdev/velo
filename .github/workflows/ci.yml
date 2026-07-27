@@ -14,10 +14,11 @@ permissions:
 env:
   # Versão do Node utilizada em todo o workflow
   NODE_VERSION: '24'
+  # A CLI da Vercel resolve o time/projeto por estas duas variáveis,
+  # então não é necessário passar --scope nos comandos.
   VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_SCOPE: fernandopapito-4832s-projects
 
 jobs:
   unit-tests:
@@ -81,12 +82,11 @@ jobs:
         run: |
           npx vercel@latest pull --yes \
           --environment=preview \
-          --token=$VERCEL_TOKEN \
-          --scope=$VERCEL_SCOPE
+          --token="$VERCEL_TOKEN"
 
       # 6. Build para o Vercel
       - name: Build Vercel
-        run: npx vercel@latest build --token=$VERCEL_TOKEN
+        run: npx vercel@latest build --token="$VERCEL_TOKEN"
 
       # 7. Deploy preview no vercel
       - name: Deploy preview
@@ -94,8 +94,7 @@ jobs:
         run: |
           URL=$(npx vercel@latest deploy --prebuilt \
           --target=preview \
-          --token=$VERCEL_TOKEN \
-          --scope=$VERCEL_SCOPE)
+          --token="$VERCEL_TOKEN")
           echo "deployment-url=$URL" >> $GITHUB_OUTPUT
 
   e2e-tests:
@@ -159,7 +158,6 @@ jobs:
     steps:
       - name: Vercel promote
         run: |
-          npx vercel@latest promote ${{ needs.build-and-deploy.outputs.deployment-url }} \
-          --token=$VERCEL_TOKEN \
-          --scope=$VERCEL_SCOPE \
+          npx vercel@latest promote "${{ needs.build-and-deploy.outputs.deployment-url }}" \
+          --token="$VERCEL_TOKEN" \
           --yes

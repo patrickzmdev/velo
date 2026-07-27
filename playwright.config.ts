@@ -39,6 +39,15 @@ export default defineConfig({
      * No CI, BASE_URL recebe a URL do deploy preview gerado no pipeline. */
     baseURL: process.env.BASE_URL || 'https://velo-dun.vercel.app',
 
+    /* Deploys de preview da Vercel são protegidos por autenticação (SSO).
+     * O bypass de automação libera o acesso via header, sem expor o preview. */
+    extraHTTPHeaders: process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+      ? {
+          'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+          'x-vercel-set-bypass-cookie': 'true',
+        }
+      : {},
+
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'retain-on-failure',
 

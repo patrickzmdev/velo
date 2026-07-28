@@ -99,8 +99,15 @@ const Footer = () => {
 
         {/* Bottom Bar */}
         <div className="mt-12 pt-8 border-t border-primary-foreground/10 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-primary-foreground/50">
+          <p className="text-sm text-primary-foreground/50 flex items-center gap-3">
             © 2025 Velô Motors. Todos os direitos reservados.
+            <span
+              data-testid="build-sha"
+              title="Commit publicado"
+              className="rounded-full bg-accent/20 px-2 py-0.5 font-mono text-xs text-accent"
+            >
+              build {__BUILD_SHA__}
+            </span>
           </p>
           <p className="text-sm text-primary-foreground/50">
             Feito com ❤️ e muito ☕️ por{" "}

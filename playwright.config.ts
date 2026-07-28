@@ -39,6 +39,12 @@ export default defineConfig({
      * No CI, BASE_URL recebe a URL do deploy preview gerado no pipeline. */
     baseURL: process.env.BASE_URL || 'https://velo-dun.vercel.app',
 
+    /* Fuso e locale fixos: a aplicação formata datas com toLocaleDateString('pt-BR'),
+     * que usa o fuso do navegador. Sem fixar, o resultado muda entre a máquina local
+     * (UTC-3) e o runner do CI (UTC), quebrando pedidos criados perto da meia-noite. */
+    timezoneId: 'America/Sao_Paulo',
+    locale: 'pt-BR',
+
     /* Deploys de preview da Vercel são protegidos por autenticação (SSO).
      * O bypass de automação libera o acesso via header, sem expor o preview. */
     extraHTTPHeaders: process.env.VERCEL_AUTOMATION_BYPASS_SECRET

@@ -132,27 +132,27 @@ jobs:
       # 6. Execução dos Testes de Regressão
       # BASE_URL aponta para o preview recém-publicado;
       # DATABASE_URL é usada pelo globalSetup para semear a massa de teste.
+      # TESTDINO_TOKEN habilita o reporter @testdino/playwright, que faz o
+      # streaming dos resultados durante o run — não existe passo de upload.
+      # Os segredos vão por env (nunca interpolados no `run`).
       - name: Run E2E Regression Tests
         run: yarn playwright test
         env:
+          TESTDINO_TOKEN: ${{ secrets.TD_TOKEN }}
+          TESTDINO_TAGS: preview,${{ github.ref_name }}
           BASE_URL: ${{ needs.build-and-deploy.outputs.deployment-url }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
-      # 7. Relatório de Testes Automatizados
+      # 7. Relatório HTML como artefato do próprio GitHub (backup do TestDino)
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7.0.1
         with:
           name: playwright-report
           path: playwright-report
-
-      # 8. Publicar report JSON do TestDino
-      # continue-on-error: falha no upload do report não deve derrubar o pipeline
-      - name: Publish Testdino Report
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: npx tdpw upload ./playwright-report --token=${{ secrets.TD_TOKEN }}
+          if-no-files-found: error
+          retention-days: 7
 
   promote:
     name: Promote to Production

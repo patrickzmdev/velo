@@ -1,12 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
+import dotenv from 'dotenv';
+import path from 'path';
 
 /**
- * Read environment variables from file.
+ * Carrega o .env antes de montar a config: o reporter do TestDino lê
+ * TESTDINO_TOKEN no momento em que este arquivo é avaliado, ou seja, antes do
+ * globalSetup. Sem isso o token só existiria em CI, nunca localmente.
  * https://github.com/motdotla/dotenv
  */
-// import dotenv from 'dotenv';
-// import path from 'path';
-// dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -31,8 +33,13 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  /* Reporter to use. See https://playwright.dev/docs/test-reporters
+   * TestDino faz streaming em tempo real (não existe passo de upload no v2);
+   * o html fica como cópia local/artefato do CI caso o dashboard esteja fora. */
+  reporter: [
+    ['@testdino/playwright', { token: process.env.TESTDINO_TOKEN }],
+    ['html', { open: 'never' }],
+  ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('')`.
@@ -54,8 +61,12 @@ export default defineConfig({
         }
       : {},
 
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
+    /* Evidência de falha. O TestDino publica apenas o que o Playwright gerar,
+     * então trace/vídeo/screenshot são o que torna a triagem possível no painel.
+     * See https://playwright.dev/docs/trace-viewer */
     trace: 'retain-on-failure',
+    video: 'retain-on-failure',
+    screenshot: 'only-on-failure',
 
     //tempo máximo para ações interativas como click, fill
     actionTimeout: 5000,

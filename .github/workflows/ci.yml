@@ -1,5 +1,16 @@
-# Workflow de Integração Contínua focado em execução de testes unitários
-# Estrutura preparada para expansão futura (novos jobs, stages, etc.)
+# Workflow de Integração/Entrega Contínua.
+#
+# Fluxo: testes unitários -> sincroniza o Supabase de preview -> build+deploy
+# preview -> testes E2E contra o preview -> (opcional) migra o Supabase de
+# produção -> build+deploy de produção.
+#
+# IMPORTANTE — por que existem DOIS builds e não um `vercel promote`:
+# As variáveis com prefixo VITE_ são substituídas por literais dentro do bundle
+# em tempo de build (Vite), e `vercel promote` apenas reaponta o domínio de
+# produção para um deployment que já existe, sem rebuildar. Promover o build de
+# preview faria a produção conversar com o Supabase de PREVIEW. Por isso a
+# produção é buildada de novo, a partir do mesmo commit, com as variáveis do
+# ambiente Production da Vercel.
 
 name: Continuous Deployment
 
@@ -49,10 +60,57 @@ jobs:
       # 5. Executa os testes unitários com Vitest (run: sem modo watch)
       - name: Run unit tests
         run: yarn test:run
-  
+
+  sync-supabase-preview:
+    name: Sync Supabase (Preview)
+    needs: [unit-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # 1. Faz checkout do código do repositório
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.2
+
+      # 2. Configura o ambiente Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v6.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'yarn'
+
+      # 3. Habilita o Corepack para gerenciamento do Yarn
+      - name: Enable Corepack
+        run: corepack enable
+
+      # 4. Instala as dependências (a CLI do Supabase é devDependency do projeto)
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      # 5. Aplica as migrações no projeto de preview.
+      # Usa --db-url em vez de `link` de propósito: o `link` grava o último
+      # projeto vinculado em supabase/.temp, e um comando seguinte sem ref
+      # explícito acabaria caindo em produção.
+      - name: Push migrations
+        env:
+          PREVIEW_DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
+        run: yarn supabase db push --db-url "$PREVIEW_DATABASE_URL" --yes
+
+      # 6. Publica as Edge Functions no projeto de preview.
+      # Sem este passo o front da preview recebe 404 ao chamar credit-analysis,
+      # porque o projeto novo nasce sem nenhuma function.
+      # --use-api monta o bundle no servidor, dispensando Docker no runner.
+      - name: Deploy Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          yarn supabase functions deploy \
+          --project-ref "${{ vars.SUPABASE_PROJECT_REF_PREVIEW }}" \
+          --use-api
+
   build-and-deploy:
     name: Build & Deploy Vercel Preview
-    needs: [unit-tests]
+    needs: [unit-tests, sync-supabase-preview]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -79,6 +137,8 @@ jobs:
         run: yarn install --frozen-lockfile
 
       # 5. Obter as configurações do vercel
+      # --environment=preview baixa as variáveis do ambiente Preview da Vercel
+      # (onde as VITE_SUPABASE_* apontam para o Supabase de preview).
       # A CLI da Vercel não é dependência do projeto, então roda via npx
       - name: Pull Vercel Config
         run: |
@@ -90,7 +150,34 @@ jobs:
       - name: Build Vercel
         run: npx vercel@latest build --token="$VERCEL_TOKEN"
 
-      # 7. Deploy preview no vercel
+      # 7. Trava de segurança: confirma que o bundle gerado fala com o Supabase
+      # de preview e não carrega nenhum vestígio da URL de produção. Falhar aqui
+      # é muito mais barato do que descobrir depois que o E2E escreveu em prod.
+      - name: Assert bundle aponta para o Supabase de preview
+        env:
+          URL_PREVIEW: ${{ vars.SUPABASE_URL_PREVIEW }}
+          URL_PROD: ${{ vars.SUPABASE_URL_PROD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$URL_PREVIEW" ] || [ -z "$URL_PROD" ]; then
+            echo "::error::Defina as repository variables SUPABASE_URL_PREVIEW e SUPABASE_URL_PROD"
+            exit 1
+          fi
+          if [ ! -d .vercel/output/static ]; then
+            echo "::error::.vercel/output/static nao existe — o build nao gerou saida estatica onde a verificacao espera."
+            exit 1
+          fi
+          if ! grep -rqF "$URL_PREVIEW" .vercel/output/static; then
+            echo "::error::O bundle de preview nao contem a URL do Supabase de preview ($URL_PREVIEW). Confira as env vars do ambiente Preview na Vercel."
+            exit 1
+          fi
+          if grep -rqF "$URL_PROD" .vercel/output/static; then
+            echo "::error::O bundle de preview contem a URL do Supabase de PRODUCAO. Deploy abortado."
+            exit 1
+          fi
+          echo "OK: bundle de preview aponta para $URL_PREVIEW"
+
+      # 8. Deploy preview no vercel
       - name: Deploy preview
         id: deploy
         run: |
@@ -131,7 +218,10 @@ jobs:
 
       # 6. Execução dos Testes de Regressão
       # BASE_URL aponta para o preview recém-publicado;
-      # DATABASE_URL é usada pelo globalSetup para semear a massa de teste.
+      # DATABASE_URL é usada pelo globalSetup para semear a massa de teste —
+      # o valor vem de PREVIEW_DATABASE_URL, nunca do banco de produção. O seed
+      # roda DELETE antes de inserir, então apontar isto para prod apagaria
+      # dados reais de clientes.
       # TESTDINO_TOKEN habilita o reporter @testdino/playwright, que faz o
       # streaming dos resultados durante o run — não existe passo de upload.
       # Os segredos vão por env (nunca interpolados no `run`).
@@ -141,7 +231,11 @@ jobs:
           TESTDINO_TOKEN: ${{ secrets.TD_TOKEN }}
           TESTDINO_TAGS: preview,${{ github.ref_name }}
           BASE_URL: ${{ needs.build-and-deploy.outputs.deployment-url }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
+          # Lidas pelo guard em playwright/support/database/db.ts, que aborta a
+          # conexão se a DATABASE_URL não for comprovadamente a de preview.
+          SUPABASE_PROJECT_REF_PREVIEW: ${{ vars.SUPABASE_PROJECT_REF_PREVIEW }}
+          SUPABASE_PROJECT_REF_PROD: ${{ vars.SUPABASE_PROJECT_REF_PROD }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
       # 7. Relatório HTML como artefato do próprio GitHub (backup do TestDino)
@@ -154,15 +248,127 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  promote:
-    name: Promote to Production
-    needs: [build-and-deploy, e2e-tests]
+  sync-supabase-production:
+    name: Sync Supabase (Production)
+    needs: [e2e-tests]
+    # Desligado por padrão. Migrar produção automaticamente a cada push na main
+    # é risco desnecessário, então isto só roda se a repository variable
+    # ENABLE_PROD_DB_MIGRATIONS for explicitamente 'true'. Com ela desligada,
+    # aplique as migrações de produção manualmente antes do merge.
+    if: ${{ vars.ENABLE_PROD_DB_MIGRATIONS == 'true' }}
+    # Configure o GitHub Environment "production" com required reviewers para
+    # que este passo exija aprovação humana.
+    environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - name: Vercel promote
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'yarn'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      # As migrações precisam chegar em produção ANTES do front novo, senão a
+      # aplicação recém-publicada bate em um schema antigo.
+      - name: Push migrations
+        env:
+          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: yarn supabase db push --db-url "$PROD_DATABASE_URL" --yes
+
+      - name: Deploy Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          npx vercel@latest promote "${{ needs.build-and-deploy.outputs.deployment-url }}" \
-          --token="$VERCEL_TOKEN" \
-          --yes
+          yarn supabase functions deploy \
+          --project-ref "${{ vars.SUPABASE_PROJECT_REF_PROD }}" \
+          --use-api
+
+  deploy-production:
+    name: Deploy to Production
+    needs: [build-and-deploy, e2e-tests, sync-supabase-production]
+    # sync-supabase-production pode ser pulado (ver o `if` daquele job). Sem
+    # esta condição explícita, um `needs` pulado pularia este job também.
+    if: >-
+      ${{ !cancelled()
+      && needs.build-and-deploy.result == 'success'
+      && needs.e2e-tests.result == 'success'
+      && (needs.sync-supabase-production.result == 'success'
+      || needs.sync-supabase-production.result == 'skipped') }}
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # 1. Mesmo commit que passou pelos testes E2E — o que muda entre o build
+      # de preview e o de produção são apenas os valores das variáveis.
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'yarn'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      # 2. Agora sim as variáveis do ambiente Production da Vercel, onde as
+      # VITE_SUPABASE_* apontam para o Supabase de produção.
+      - name: Pull Vercel Config (production)
+        run: |
+          npx vercel@latest pull --yes \
+          --environment=production \
+          --token="$VERCEL_TOKEN"
+
+      - name: Build Vercel (production)
+        run: npx vercel@latest build --prod --token="$VERCEL_TOKEN"
+
+      # 3. Trava espelhada: o bundle de produção precisa falar com o Supabase de
+      # produção e não pode carregar nenhum resquício da URL de preview.
+      - name: Assert bundle aponta para o Supabase de produção
+        env:
+          URL_PREVIEW: ${{ vars.SUPABASE_URL_PREVIEW }}
+          URL_PROD: ${{ vars.SUPABASE_URL_PROD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$URL_PREVIEW" ] || [ -z "$URL_PROD" ]; then
+            echo "::error::Defina as repository variables SUPABASE_URL_PREVIEW e SUPABASE_URL_PROD"
+            exit 1
+          fi
+          if [ ! -d .vercel/output/static ]; then
+            echo "::error::.vercel/output/static nao existe — o build nao gerou saida estatica onde a verificacao espera."
+            exit 1
+          fi
+          if ! grep -rqF "$URL_PROD" .vercel/output/static; then
+            echo "::error::O bundle de producao nao contem a URL do Supabase de producao ($URL_PROD). Confira as env vars do ambiente Production na Vercel."
+            exit 1
+          fi
+          if grep -rqF "$URL_PREVIEW" .vercel/output/static; then
+            echo "::error::O bundle de producao contem a URL do Supabase de PREVIEW. Deploy abortado."
+            exit 1
+          fi
+          echo "OK: bundle de producao aponta para $URL_PROD"
+
+      # 4. Publica em produção. Substitui o antigo `vercel promote`: promote não
+      # rebuilda, então promover o preview levaria as VITE_SUPABASE_* de preview
+      # junto para produção.
+      - name: Deploy production
+        run: |
+          URL=$(npx vercel@latest deploy --prebuilt \
+          --prod \
+          --token="$VERCEL_TOKEN")
+          echo "Deploy de producao publicado: $URL"

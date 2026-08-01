@@ -22,6 +22,11 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     // Unit tests live under src/; Playwright specs under playwright/ run separately.
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // O segundo padrão cobre apenas *.test.ts do suporte do Playwright (ex.: o
+    // guard de banco), sem alcançar os *.spec.ts de e2e.
+    include: [
+      "src/**/*.{test,spec}.{ts,tsx}",
+      "playwright/support/**/*.test.ts",
+    ],
   },
 });

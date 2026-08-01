@@ -1,5 +1,7 @@
-/// <reference types="vitest" />
-import { defineConfig } from "vite";
+// defineConfig vem de "vitest/config" (e não de "vite") porque é ele que
+// conhece a chave `test`. O vitest 4 deixou de augmentar os tipos do vite via
+// `/// <reference types="vitest" />`.
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 

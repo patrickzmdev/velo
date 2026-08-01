@@ -57,7 +57,12 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      # 5. Executa os testes unitários com Vitest (run: sem modo watch)
+      # 5. Typecheck. Nem o Vitest nem o Playwright verificam tipos — ambos só
+      # transpilam — então sem este passo erros de tipo só apareceriam no editor.
+      - name: Typecheck
+        run: yarn typecheck
+
+      # 6. Executa os testes unitários com Vitest (run: sem modo watch)
       - name: Run unit tests
         run: yarn test:run
 
